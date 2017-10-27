@@ -16,10 +16,40 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
 
-function getChirps() {
+function getUsers() {
     return new Promise ((fulfill, reject) => {
         pool.getConnection((err, connection) => {
             if (err) {reject(err);}
+            else {
+                connection.query("CALL getUsers();", (err, resultsets) => {
+                    connection.release();
+                    if (err) {reject(err);} 
+                    else {fulfill(resultsets);};
+                }) 
+            }
+        });
+    });
+};
+
+function userInsert(user) {
+    return new Promise ((fulfill, reject) => {
+        pool.getConnection((err, connection) =>{
+            if (err) {reject(err);} 
+            else {
+                connection.query("CALL userInsert(?);", [user], (err, resultsets) => {
+                    connection.release();
+                    if (err) {reject(err);} 
+                    else ;{fulfill(resultsets);}
+                })
+            }
+        })
+    })
+};
+
+function getChirps() {
+    return new Promise ((fulfill, reject) => {
+        pool.getConnection((err, connection) => {
+            if (err) {reject(err);} 
             else {
                 connection.query("CALL getChirps();", (err, resultsets) => {
                     connection.release();
@@ -34,7 +64,8 @@ function getChirps() {
 function insertChirps(userText, messageText) {
     return new Promise ((fulfill, reject) => {
         pool.getConnection((err, connection) =>{
-            if (err) {reject(err);} else {
+            if (err) {reject(err);} 
+            else {
                 connection.query("CALL insertChirps(?,?);", [userText, messageText], (err, resultsets) => {
                     connection.release();
                     if (err) {reject(err);} 
@@ -60,26 +91,42 @@ function deleteChirps(id) {
     });
 };
 
-// function updateChirps(id, message) {
-//     return new Promise ((fulfill, reject) => {
-//         pool.getConnection((err, connection) => {
-//             if (err){reject(err);}
-//             else {
-//                 connection.query("CALL updateChirps(?,?);", [id, message], (err, resultsets) => {
-//                     connection.release();
-//                     if (err){reject(err);}
-//                     else {fulfill(resultsets);};
-//                 });
-//             };
-//         });
-//     });
-// };
+function getOneChirp(id) {
+    return new Promise ((fulfill, reject) => {
+        pool.getConnection((err, connection) => {
+            if (err) {reject(err);}
+            else {
+                connection.query("CALL selectOneChirps(?)", [id], (err, resultsets) => {
+                    connection.release();
+                    if (err) {reject(err);} 
+                    else {fulfill(resultsets);};
+                }) 
+            }
+        });
+    });
+};
+function updateChirps(id, message) {
+    return new Promise ((fulfill, reject) => {
+        pool.getConnection((err, connection) => {
+            if (err){reject(err);}
+            else {
+                connection.query("CALL updateChirps(?,?);", [id, message], (err, resultsets) => {
+                    connection.release();
+                    if (err){reject(err);}
+                    else {
+                        fulfill(resultsets);
+                    };
+                });
+            };
+        });
+    });
+};
 
 
-
-app.get('/', (req, res) => {
+app.route('/')
+    .get((req, res) => {
     res.sendFile(path.join(clientPath, 'index.html'));
-});
+    })
 
 app.route('/api/chirps')
     .get((req, res) => {
@@ -90,19 +137,18 @@ app.route('/api/chirps')
         })
     })
     .post((req, res) => {
-        let user = req.body.user;
+        let userId = req.body.userId;
         let message = req.body.message;
-        insertChirps(user, message).then(function(id) {
+        insertChirps(userId, message).then(function(id) {
             res.status(201).send(id);
         }, function(err) {
             res.status(500).send(err);
         })
     });
 
-
 app.route('/api/chirps/:id')
-    .post((req, res) => {
-        let deleteId = req.body.ajaxId;
+    .delete((req, res) => {
+        let deleteId = req.params.id;
         deleteChirps(deleteId).then(function(id){
             res.status(201).send(id);
         }, function(err) {
@@ -110,18 +156,53 @@ app.route('/api/chirps/:id')
         })
     });
 
-// app.route('/api/chirps/update')
-//     .post((req, res) => {
-//         let updateId = req.body.id;
-//         console.log(updateId);
-//         let message = req.body.message;
-//         console.log(message);
-//         updateChirps(updateId, message).then(function(id){
-//             res.status(201).send(id);
-//         }, function(err){
-//             res.status(500).send(err);
-//         })
-//     });
+app.route('/api/users/:id')
+    .get((req, res) => {
+        let userId = req.params.id;
+        getOneChirp(userId).then(function(id){
+            res.status(201).send(id);
+        }, function(err) {
+            res.status(500).send(err);
+        })
+    })
+    .delete((req, res) => {
+        let deleteId = req.params.id;
+        console.log(deleteId);
+        deleteChirps(deleteId).then(function(id){
+            res.status(201).send(id);
+        }, function(err) {
+            res.status(500).send(err);
+        })
+    });
+
+app.route('/api/chirps/update')
+    .post((req, res) => {
+        let updateId = req.body.id;
+        let message = req.body.message;
+        updateChirps(updateId, message).then(function(id){
+            res.status(201).send(id);
+        }, function(err){
+            res.status(500).send(err);
+        })
+    });
+
+app.route("/api/users")
+    .get((req, res) => {
+        getUsers().then(function(users){
+            res.send(users);
+        }, function(err) {
+            res.status(500).send(err);
+        })
+    })
+    .post((req, res) => {
+        let user = req.body.userName;
+        console.log(user);
+        userInsert(user).then(function(id) {
+            res.status(201).send(id);
+        }, function(err) {
+            res.status(500).send(err);
+        });
+    });
 
 app.use(express.static(clientPath));
 
